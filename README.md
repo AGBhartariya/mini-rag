@@ -1,4 +1,4 @@
-# Mini RAG System — Retrieval, Reranking & Grounded Citations
+# Mini RAG System : Retrieval, Reranking & Grounded Citations
 
 This project is a full-stack **Retrieval-Augmented Generation (RAG)** system that ingests documents (text or PDF), retrieves relevant chunks using vector search, reranks them for diversity and relevance, and generates **grounded answers with explicit citations**.
 
