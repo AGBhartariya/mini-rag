@@ -7,3 +7,4 @@ cohere
 qdrant-client
 pypdf
 python-multipart
+pdfplumber
