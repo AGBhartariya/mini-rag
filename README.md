@@ -84,8 +84,9 @@ Vector Database (Qdrant Cloud)
 - **Embeddings:** `embed-english-v3.0`
 - **LLM:** `command-r-08-2024`
 - **Vector DB:** Qdrant Cloud
-
+```
 ---
+
 ## 📐 Schema & Index Configuration
 
 This project uses **Qdrant** as the vector database to store document chunks and perform semantic retrieval.
