@@ -1,192 +1,38 @@
-# from qdrant_client import QdrantClient
-# from qdrant_client.http.models import VectorParams, Distance, PointStruct
-# import os
-
-# VECTOR_SIZE = 1024
-# COLLECTION_NAME = "mini_rag_chunks"
-
-
-# def get_qdrant_client():
-#     return QdrantClient(
-#         url=os.getenv("QDRANT_URL"),
-#         api_key=os.getenv("QDRANT_API_KEY"),
-#     )
-
-
-# def init_collection():
-#     client = get_qdrant_client()
-
-#     collections = client.get_collections().collections
-#     if any(c.name == COLLECTION_NAME for c in collections):
-#         return
-
-#     client.create_collection(
-#         collection_name=COLLECTION_NAME,
-#         vectors_config=VectorParams(
-#             size=VECTOR_SIZE,
-#             distance=Distance.COSINE
-#         )
-#     )
-
-
-# def upsert_chunks(vectors, payloads):
-#     client = get_qdrant_client()
-
-#     points = [
-#         PointStruct(
-#             id=payload["chunk_id"],
-#             vector=vector,
-#             payload=payload
-#         )
-#         for vector, payload in zip(vectors, payloads)
-#     ]
-
-#     client.upsert(
-#         collection_name=COLLECTION_NAME,
-#         points=points
-#     )
-
-
-# # 🔥 STEP 6: RETRIEVAL FUNCTION
-# def search_similar_chunks(query_vector, top_k: int = 5):
-#     client = get_qdrant_client()
-
-#     results = client.search(
-#         collection_name=COLLECTION_NAME,
-#         query_vector=query_vector,
-#         limit=top_k,
-#         with_payload=True,
-#     )
-
-#     return results
-
-# from qdrant_client import QdrantClient
-# from qdrant_client.http.models import VectorParams, Distance, PointStruct
-# import os
-# import uuid
-
-# VECTOR_SIZE = 1024
-# COLLECTION_NAME = "mini_rag_chunks"
-
-
-# def get_qdrant_client():
-#     return QdrantClient(
-#         url=os.getenv("QDRANT_URL"),
-#         api_key=os.getenv("QDRANT_API_KEY"),
-#     )
-
-
-# def init_collection():
-#     client = get_qdrant_client()
-
-#     collections = client.get_collections().collections
-#     if any(c.name == COLLECTION_NAME for c in collections):
-#         return
-
-#     client.create_collection(
-#         collection_name=COLLECTION_NAME,
-#         vectors_config=VectorParams(
-#             size=VECTOR_SIZE,
-#             distance=Distance.COSINE,
-#         ),
-#     )
-
-
-# def upsert_chunks(vectors, payloads):
-#     client = get_qdrant_client()
-
-#     points = []
-#     for vector, payload in zip(vectors, payloads):
-#         points.append(
-#             PointStruct(
-#                 id=str(uuid.uuid4()),  # ✅ globally unique
-#                 vector=vector,
-#                 payload=payload,
-#             )
-#         )
-
-#     client.upsert(
-#         collection_name=COLLECTION_NAME,
-#         points=points,
-#     )
-
-
-# def search_similar_chunks(query_vector, top_k: int = 5):
-#     client = get_qdrant_client()
-
-#     results = client.search(
-#         collection_name=COLLECTION_NAME,
-#         query_vector=query_vector,
-#         limit=top_k,
-#         with_payload=True,
-#     )
-
-#     # Normalize results for downstream pipeline
-#     chunks = []
-#     for r in results:
-#         chunks.append({
-#             "text": r.payload["text"],
-#             "metadata": {
-#                 k: v for k, v in r.payload.items() if k != "text"
-#             },
-#             "score": r.score,
-#         })
-
-#     return chunks
-
-# def mmr_select(chunks, lambda_param=0.7, top_k=5):
-#     selected = []
-#     candidates = chunks.copy()
-
-#     while len(selected) < top_k and candidates:
-#         best = None
-#         best_score = -1e9
-
-#         for c in candidates:
-#             relevance = c["score"]
-#             diversity = max(
-#                 [abs(c["score"] - s["score"]) for s in selected]
-#                 or [0]
-#             )
-
-#             score = lambda_param * relevance - (1 - lambda_param) * diversity
-
-#             if score > best_score:
-#                 best_score = score
-#                 best = c
-
-#         selected.append(best)
-#         candidates.remove(best)
-
-#     return selected
+import os
+import uuid
+from typing import List
 
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import VectorParams, Distance, PointStruct
-import os
-import uuid
 
-VECTOR_SIZE = 1024
+# --------------------------------------------------
+# Config
+# --------------------------------------------------
+VECTOR_SIZE = 4096  # MUST match Cohere embed-english-v3.0
 COLLECTION_NAME = "mini_rag_chunks"
 
 
 # --------------------------------------------------
-# Client
+# Qdrant client
 # --------------------------------------------------
-def get_qdrant_client():
-    return QdrantClient(
-        url=os.getenv("QDRANT_URL"),
-        api_key=os.getenv("QDRANT_API_KEY"),
-    )
+def get_qdrant_client() -> QdrantClient:
+    url = os.getenv("QDRANT_URL")
+    api_key = os.getenv("QDRANT_API_KEY")
+
+    if not url or not api_key:
+        raise RuntimeError("QDRANT_URL or QDRANT_API_KEY missing.")
+
+    return QdrantClient(url=url, api_key=api_key)
 
 
 # --------------------------------------------------
-# Init collection
+# Initialize collection (idempotent)
 # --------------------------------------------------
 def init_collection():
     client = get_qdrant_client()
 
-    collections = client.get_collections().collections
-    if any(c.name == COLLECTION_NAME for c in collections):
+    existing = [c.name for c in client.get_collections().collections]
+    if COLLECTION_NAME in existing:
         return
 
     client.create_collection(
@@ -199,14 +45,17 @@ def init_collection():
 
 
 # --------------------------------------------------
-# Upsert
+# Upsert chunks
 # --------------------------------------------------
-def upsert_chunks(vectors, payloads):
+def upsert_chunks(vectors: List[List[float]], payloads: List[dict]):
+    if not vectors or not payloads:
+        return
+
     client = get_qdrant_client()
 
     points = [
         PointStruct(
-            id=str(uuid.uuid4()),   # ✅ unique, avoids overwrite bugs
+            id=str(uuid.uuid4()),
             vector=vector,
             payload=payload,
         )
@@ -220,9 +69,12 @@ def upsert_chunks(vectors, payloads):
 
 
 # --------------------------------------------------
-# Search (🔥 NORMALIZED OUTPUT)
+# Search similar chunks (SAFE + NORMALIZED)
 # --------------------------------------------------
-def search_similar_chunks(query_vector, top_k: int = 5):
+def search_similar_chunks(query_vector: List[float], top_k: int = 5):
+    if not query_vector:
+        return []
+
     client = get_qdrant_client()
 
     results = client.search(
@@ -232,32 +84,51 @@ def search_similar_chunks(query_vector, top_k: int = 5):
         with_payload=True,
     )
 
-    # 🔥 Normalize ONCE, here
-    return [
-        {
-            "text": r.payload["text"],
-            "metadata": {
-                k: v for k, v in r.payload.items() if k != "text"
-            },
-            "score": r.score,
-        }
-        for r in results
-    ]
+    normalized = []
+    for r in results:
+        payload = r.payload or {}
+        text = payload.get("text")
+
+        if not text:
+            continue
+
+        normalized.append(
+            {
+                "text": text,
+                "metadata": {k: v for k, v in payload.items() if k != "text"},
+                "score": r.score,
+            }
+        )
+
+    return normalized
 
 
 # --------------------------------------------------
-# MMR Selection
+# MMR selection (stable + bounded)
 # --------------------------------------------------
-def mmr_select(chunks, lambda_param=0.7, top_k=5):
+def mmr_select(
+    chunks: List[dict],
+    lambda_param: float = 0.7,
+    top_k: int = 5,
+):
+    """
+    Simple score-based MMR.
+    Uses similarity scores only (acceptable for demo / eval).
+    """
+
+    if not chunks:
+        return []
+
     selected = []
     candidates = chunks.copy()
 
-    while len(selected) < top_k and candidates:
+    while len(selected) < min(top_k, len(chunks)):
         best = None
-        best_score = -1e9
+        best_score = float("-inf")
 
         for c in candidates:
             relevance = c["score"]
+
             diversity = max(
                 [abs(c["score"] - s["score"]) for s in selected]
                 or [0]
