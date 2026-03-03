@@ -90,6 +90,9 @@ def mmr_select(
 def health():
     return {"status": "ok"}
 
+@app.get("/")
+def root():
+    return {"message": "Mini RAG backend is running"}
 
 # =========================
 # INGEST (TEXT)
