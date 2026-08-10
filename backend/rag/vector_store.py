@@ -8,7 +8,7 @@ from qdrant_client.http.models import VectorParams, Distance, PointStruct
 # --------------------------------------------------
 # Config
 # --------------------------------------------------
-VECTOR_SIZE = 4096  # MUST match Cohere embed-english-v3.0
+VECTOR_SIZE = 1024  # MUST match Cohere embed-english-v3.0
 COLLECTION_NAME = "mini_rag_chunks"
 
 
