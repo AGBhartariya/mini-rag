@@ -37,6 +37,8 @@ export default function IngestPanel() {
         }),
       });
 
+      console.log("Ingest response:", res);
+
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(errorText || "Ingest failed");
