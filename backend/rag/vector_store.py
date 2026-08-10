@@ -77,13 +77,13 @@ def search_similar_chunks(query_vector: List[float], top_k: int = 5):
 
     client = get_qdrant_client()
 
-    results = client.search(
+    results = client.query_points(
         collection_name=COLLECTION_NAME,
-        query_vector=query_vector,
+        query=query_embedding,
         limit=top_k,
         with_payload=True,
-    )
-
+    ).points
+    
     normalized = []
     for r in results:
         payload = r.payload or {}
