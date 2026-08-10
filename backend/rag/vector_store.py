@@ -79,11 +79,11 @@ def search_similar_chunks(query_vector: List[float], top_k: int = 5):
 
     results = client.query_points(
         collection_name=COLLECTION_NAME,
-        query=query_embedding,
+        query=query_vector,
         limit=top_k,
         with_payload=True,
     ).points
-    
+
     normalized = []
     for r in results:
         payload = r.payload or {}
