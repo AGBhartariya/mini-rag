@@ -18,8 +18,8 @@ if not COHERE_API_KEY:
 # --------------------------------------------------
 co = cohere.Client(COHERE_API_KEY)
 
-# Cohere embed-english-v3.0 → 4096 dims
-VECTOR_SIZE = 4096
+# Cohere embed-english-v3.0 → 1024 dims
+VECTOR_SIZE = 1024
 
 
 # --------------------------------------------------
@@ -30,7 +30,7 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
     Generate embeddings for a list of texts using Cohere.
 
     Returns:
-        List of 4096-dim vectors
+        List of 1024-dim vectors
     """
     if not texts:
         return []
